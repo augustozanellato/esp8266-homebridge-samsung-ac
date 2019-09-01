@@ -17,8 +17,9 @@ enum HeatingCoolingState {
 
 struct Status{
   HeatingCoolingState currentHeatingCoolingState, targetHeatingCoolingState;
-  float targetTemperature;
-  float currentTemperature, currentRelativeHumidity;
+  int targetTemperature;
+  int currentTemperature, currentRelativeHumidity;
+  int coolingThresholdTemperature, heatingThresholdTemperature;
   bool dirty;
 };
 

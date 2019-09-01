@@ -16,33 +16,35 @@ DHTesp espDHT;
 Status status;
 
 void updateStatus(){
-    status.currentHeatingCoolingState = status.targetHeatingCoolingState;
     status.currentTemperature = espDHT.getTemperature();
     status.currentRelativeHumidity = espDHT.getHumidity();
-    float tempDiff = status.currentTemperature - status.targetTemperature;
+    digitalWrite(16, !(isnan(status.currentTemperature) || isnan(status.currentRelativeHumidity)));
+    int tempDiff = status.currentTemperature - status.targetTemperature;
     #if DEBUG
-    Serial.printf(PSTR("Temperature: %f, Humidity: %f, DeltaTemp: %f"), status.currentTemperature, status.currentRelativeHumidity, tempDiff);
+    Serial.printf(PSTR("Temperature: %d, Humidity: %d, DeltaTemp: %d, coolingThresholdTemperature: %d, heatingThresholdTemperature: %d"), status.currentTemperature, status.currentRelativeHumidity, tempDiff, status.coolingThresholdTemperature, status.heatingThresholdTemperature);
     #endif
-    if (abs(tempDiff) < 0.5){
-        #if DEBUG
-        Serial.printf(PSTR(", so current state is now OFF\n"));
-        #endif
-        status.currentHeatingCoolingState = OFF;
-    } else if (status.currentHeatingCoolingState == AUTO){
+    if (status.targetHeatingCoolingState == AUTO){
         #if DEBUG
         Serial.printf(PSTR(", target state is AUTO "));
         #endif
-        if (tempDiff > 0){
+        if (status.currentTemperature > status.coolingThresholdTemperature){
             #if DEBUG
             Serial.printf(PSTR("so current state is now COOL\n"));
             #endif
             status.currentHeatingCoolingState = COOL;
-        } else {
+            status.dirty = true;
+        } else if (status.currentTemperature < status.heatingThresholdTemperature){
             #if DEBUG
             Serial.printf(PSTR("so current state is now HEAT\n"));
             #endif
             status.currentHeatingCoolingState = HEAT;
+            status.dirty = true;
         }
+        #if DEBUG
+        else{
+            Serial.printf(PSTR("\n"));
+        }
+        #endif
     }
     #if DEBUG
     else{
@@ -60,7 +62,9 @@ void initializeStatus(){
 
     status.targetHeatingCoolingState = OFF;
     status.targetTemperature = 20;
-    
+    status.coolingThresholdTemperature = 30;
+    status.heatingThresholdTemperature = 20;
+
     updateStatus();
 }
 
@@ -72,6 +76,7 @@ void setup() {
     espDHT.setup(D3, DHTesp::DHT11);
     Serial.begin(115200);
     samsungAC.begin();
+    pinMode(16, OUTPUT);
     WiFi.mode(WIFI_STA);
     WiFi.config(deviceIP, gatewayIP, netMask, dnsIP);
     WiFi.begin(SSID, PASSWORD);
@@ -82,8 +87,10 @@ void setup() {
 
     initializeStatus();
     
-    server.addRewrite(new OneParamRewrite("/targetHeatingCoolingState/{state}", "/targetHeatingCoolingState?state={state}"));
-    server.addRewrite(new OneParamRewrite("/targetTemperature/{temperature}", "/targetTemperature?temp={temperature}"));
+    server.addRewrite(new OneParamRewrite(PSTR("/targetHeatingCoolingState/{state}"), PSTR("/targetHeatingCoolingState?state={state}")));
+    server.addRewrite(new OneParamRewrite(PSTR("/targetTemperature/{temperature}"), PSTR("/targetTemperature?temp={temperature}")));
+    server.addRewrite(new OneParamRewrite(PSTR("/coolingThresholdTemperature/{temperature}"), PSTR("/coolingThresholdTemperature?temp={temperature}")));
+    server.addRewrite(new OneParamRewrite(PSTR("/heatingThresholdTemperature/{temperature}"), PSTR("/heatingThresholdTemperature?temp={temperature}")));
 
     server.on(PSTR("/targetHeatingCoolingState"), HTTP_GET, [] (AsyncWebServerRequest *request) {
         if (request->hasParam(STATE_PARAMETER)) {
@@ -105,6 +112,24 @@ void setup() {
         }
     });
 
+    server.on(PSTR("/coolingThresholdTemperature"), HTTP_GET, [] (AsyncWebServerRequest *request) {
+        if (request->hasParam(TEMPERATURE_PARAMETER)) {
+            status.coolingThresholdTemperature = request->getParam(TEMPERATURE_PARAMETER)->value().toInt();
+            request->send_P(200, TEXT_PLAIN, SUCCESS);
+        } else {
+            request->send_P(400, TEXT_PLAIN, MALFORMED_REQUEST);
+        }
+    });
+
+    server.on(PSTR("/heatingThresholdTemperature"), HTTP_GET, [] (AsyncWebServerRequest *request) {
+        if (request->hasParam(TEMPERATURE_PARAMETER)) {
+            status.heatingThresholdTemperature = request->getParam(TEMPERATURE_PARAMETER)->value().toInt();
+            request->send_P(200, TEXT_PLAIN, SUCCESS);
+        } else {
+            request->send_P(400, TEXT_PLAIN, MALFORMED_REQUEST);
+        }
+    });
+
     // Send a GET request to <IP>/get?message=<message>
     server.on(PSTR("/status"), HTTP_GET, [] (AsyncWebServerRequest *request) {
         AsyncResponseStream *response = request->beginResponseStream(PSTR("application/json"));
@@ -114,6 +139,8 @@ void setup() {
         json["currentTemperature"] = status.currentTemperature;
         json["targetTemperature"] = status.targetTemperature;
         json["currentRelativeHumidity"] = status.currentRelativeHumidity;
+        json["coolingThresholdTemperature"] = status.coolingThresholdTemperature;
+        json["heatingThresholdTemperature"] = status.heatingThresholdTemperature;
         serializeJsonPretty(json, *response);
         request->send(response);
     });
@@ -127,13 +154,13 @@ void setup() {
 
 void loop() {
     static long last_update = millis();
-    if (millis() - last_update > UPDATE_DELAY){
+    if (millis() - last_update > UPDATE_INTERVAL){
         last_update = millis();
         updateStatus();
     }
     if (status.dirty){
         status.dirty = false;
-        switch (status.targetHeatingCoolingState){
+        switch (status.currentHeatingCoolingState){
             case OFF:
                 if (samsungAC.getPower()){
                     samsungAC.off();
@@ -159,11 +186,13 @@ void loop() {
             case AUTO:
                 if (!samsungAC.getPower()){
                     samsungAC.on();
+                    samsungAC.send();
                 }
-                samsungAC.setMode(kSamsungAcAuto);
-                samsungAC.setTemp(status.targetTemperature);
-                samsungAC.send();
                 break;
         }
+        #if DEBUG
+            Serial.printf(samsungAC.toString().c_str());
+            Serial.printf("\n");
+        #endif
     }
 }
