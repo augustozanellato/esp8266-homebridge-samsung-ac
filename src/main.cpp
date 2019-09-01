@@ -19,9 +19,8 @@ void updateStatus(){
     status.currentTemperature = espDHT.getTemperature();
     status.currentRelativeHumidity = espDHT.getHumidity();
     digitalWrite(16, !(isnan(status.currentTemperature) || isnan(status.currentRelativeHumidity)));
-    int tempDiff = status.currentTemperature - status.targetTemperature;
     #if DEBUG
-    Serial.printf(PSTR("Temperature: %d, Humidity: %d, DeltaTemp: %d, coolingThresholdTemperature: %d, heatingThresholdTemperature: %d"), status.currentTemperature, status.currentRelativeHumidity, tempDiff, status.coolingThresholdTemperature, status.heatingThresholdTemperature);
+    Serial.printf(PSTR("Temperature: %d, Humidity: %d, targetTemperature: %d, coolingThresholdTemperature: %d, heatingThresholdTemperature: %d"), status.currentTemperature, status.currentRelativeHumidity, status.targetTemperature, status.coolingThresholdTemperature, status.heatingThresholdTemperature);
     #endif
     if (status.targetHeatingCoolingState == AUTO){
         #if DEBUG
