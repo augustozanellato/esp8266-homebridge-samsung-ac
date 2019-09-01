@@ -22,4 +22,5 @@ jobs:
         platformio update
     - name: Build
       run: |
+        cp src/config.sample.h src/config.h
         platformio run
