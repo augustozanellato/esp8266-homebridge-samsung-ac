@@ -16,9 +16,17 @@ DHTesp espDHT;
 Status status;
 
 void updateStatus(){
-    status.currentTemperature = espDHT.getTemperature();
-    status.currentRelativeHumidity = espDHT.getHumidity();
-    digitalWrite(16, !(isnan(status.currentTemperature) || isnan(status.currentRelativeHumidity)));
+    float temperature = espDHT.getTemperature();
+    float humidity = espDHT.getHumidity();
+
+    if ((isnan(status.currentTemperature) || isnan(status.currentRelativeHumidity))){
+        digitalWrite(16, LOW);
+        return;
+    } else {
+        digitalWrite(16, HIGH);
+        status.currentTemperature = temperature;
+        status.currentRelativeHumidity = humidity;
+    }
     #if DEBUG
     Serial.printf(PSTR("Temperature: %d, Humidity: %d, targetTemperature: %d, coolingThresholdTemperature: %d, heatingThresholdTemperature: %d"), status.currentTemperature, status.currentRelativeHumidity, status.targetTemperature, status.coolingThresholdTemperature, status.heatingThresholdTemperature);
     #endif
@@ -30,20 +38,27 @@ void updateStatus(){
             #if DEBUG
             Serial.printf(PSTR("so current state is now COOL\n"));
             #endif
-            status.currentHeatingCoolingState = COOL;
-            status.dirty = true;
+            if (status.currentHeatingCoolingState != COOL){
+                status.currentHeatingCoolingState = COOL;
+                status.dirty = true;
+            }
         } else if (status.currentTemperature < status.heatingThresholdTemperature){
             #if DEBUG
             Serial.printf(PSTR("so current state is now HEAT\n"));
             #endif
-            status.currentHeatingCoolingState = HEAT;
-            status.dirty = true;
+            if (status.currentHeatingCoolingState != HEAT){
+                status.currentHeatingCoolingState = HEAT;
+                status.dirty = true;
+            }
+        } else {
+            #if DEBUG
+            Serial.printf(PSTR("so current state is now OFF\n"));
+            #endif
+            if(status.currentHeatingCoolingState != OFF){
+                status.currentHeatingCoolingState = OFF;
+                status.dirty = true;
+            }
         }
-        #if DEBUG
-        else{
-            Serial.printf(PSTR("\n"));
-        }
-        #endif
     }
     #if DEBUG
     else{
@@ -60,6 +75,7 @@ void initializeStatus(){
     samsungAC.setSwing(false);
 
     status.targetHeatingCoolingState = OFF;
+    status.currentHeatingCoolingState = OFF;
     status.targetTemperature = 20;
     status.coolingThresholdTemperature = 30;
     status.heatingThresholdTemperature = 20;
@@ -94,6 +110,7 @@ void setup() {
     server.on(PSTR("/targetHeatingCoolingState"), HTTP_GET, [] (AsyncWebServerRequest *request) {
         if (request->hasParam(STATE_PARAMETER)) {
             status.targetHeatingCoolingState = static_cast<HeatingCoolingState>(request->getParam(STATE_PARAMETER)->value().toInt());
+            status.currentHeatingCoolingState = status.targetHeatingCoolingState;
             status.dirty = true;
             request->send_P(200, TEXT_PLAIN, SUCCESS);
         } else {
@@ -164,6 +181,10 @@ void loop() {
                 if (samsungAC.getPower()){
                     samsungAC.off();
                     samsungAC.send();
+                    #if DEBUG
+                        Serial.printf(samsungAC.toString().c_str());
+                        Serial.printf("\n");
+                    #endif
                 }
                 break;
             case HEAT:
@@ -173,6 +194,10 @@ void loop() {
                 samsungAC.setMode(kSamsungAcHeat);
                 samsungAC.setTemp(status.targetTemperature);
                 samsungAC.send();
+                #if DEBUG
+                    Serial.printf(samsungAC.toString().c_str());
+                    Serial.printf("\n");
+                #endif
                 break;
             case COOL:
                 if (!samsungAC.getPower()){
@@ -181,17 +206,21 @@ void loop() {
                 samsungAC.setMode(kSamsungAcCool);
                 samsungAC.setTemp(status.targetTemperature);
                 samsungAC.send();
+                #if DEBUG
+                    Serial.printf(samsungAC.toString().c_str());
+                    Serial.printf("\n");
+                #endif
                 break;
             case AUTO:
                 if (!samsungAC.getPower()){
                     samsungAC.on();
                     samsungAC.send();
+                    #if DEBUG
+                        Serial.printf(samsungAC.toString().c_str());
+                        Serial.printf("\n");
+                    #endif
                 }
                 break;
         }
-        #if DEBUG
-            Serial.printf(samsungAC.toString().c_str());
-            Serial.printf("\n");
-        #endif
     }
 }
