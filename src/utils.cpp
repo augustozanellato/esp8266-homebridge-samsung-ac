@@ -1,12 +1,17 @@
-#include <Arduino.h>
-#include <ESPAsyncWebServer.h>
 #include <utils.h>
 
 const char* TEXT_PLAIN PROGMEM = "text/plain";
 const char* STATE_PARAMETER PROGMEM = "state";
 const char* TEMPERATURE_PARAMETER PROGMEM = "temp";
+const char* WEBUI_PARAMETER PROGMEM = "web";
 const char* MALFORMED_REQUEST PROGMEM = "Malformed request";
 const char* SUCCESS PROGMEM = "Ok";
+const char* HOMEBRIDGE_UPDATE_URLS[] = {
+    "/targetHeatingCoolingState/",
+    "/targetTemperature/",
+    "/coolingThresholdTemperature/",
+    "/heatingThresholdTemperature/"
+};
 
 bool OneParamRewrite::match(AsyncWebServerRequest *request) {
     if(request->url().startsWith(_urlPrefix)) {
@@ -33,4 +38,32 @@ OneParamRewrite::OneParamRewrite(const char* from, const char* to) : AsyncWebRew
         _urlPrefix = _from;
     }
     _paramsBackup = _params;
+}
+
+DynamicJsonDocument generateJsonFromStatus(const Status& status){
+    DynamicJsonDocument json(1024);
+    json["targetHeatingCoolingState"] = (int) status.targetHeatingCoolingState;
+    json["currentHeatingCoolingState"] = (int) status.currentHeatingCoolingState;
+    json["currentTemperature"] = status.currentTemperature;
+    json["targetTemperature"] = status.targetTemperature;
+    json["currentRelativeHumidity"] = status.currentRelativeHumidity;
+    json["coolingThresholdTemperature"] = status.coolingThresholdTemperature;
+    json["heatingThresholdTemperature"] = status.heatingThresholdTemperature;
+    return json;
+}
+
+
+int getStatusValueByIndex(const Status& status, const StatusIndex idx){
+    switch (idx){
+        case TARGET_HEATING_COOLING_STATE_INDEX:
+            return status.targetHeatingCoolingState;
+        case TARGET_TEMPERATURE_INDEX:
+            return status.targetTemperature;
+        case COOLING_THRESHOLD_TEMPERATURE_INDEX:
+            return status.coolingThresholdTemperature;
+        case HEATING_THRESHOLD_TEMPERATURE_INDEX:
+            return status.heatingThresholdTemperature;
+        default:
+            return -1;
+    }
 }

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>AC Control</title>
+    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/nouislider.min.css">
+    <script src="assets/nouislider.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/superagent"></script>
+</head>
+<body>
+    <script>
+        var activeMode = %ACTIVE_MODE%;
+        var activeFan = %ACTIVE_FAN%;
+        var currentTemperature = %CURRENT_TEMPERATURE%;
+        var currentHumidity = %CURRENT_HUMIDITY%;
+        var targetTemperature = %TARGET_TEMPERATURE%;
+        var heatingThresholdTemperature = %HEATING_THRESHOLD_TEMPERATURE%;
+        var coolingThresholdTemperature = %COOLING_THRESHOLD_TEMPERATURE%;
+
+        function update(){
+            document.getElementById("mode" + activeMode).checked = true;
+            document.getElementById("fan" + activeFan).checked = true;
+
+            document.getElementById("autoTemperatureControl").style.display = activeMode == 3 ? "block" : "none";
+            document.getElementById("manualTemperatureControl").style.display = activeMode != 3 ? "block" : "none";
+
+            document.getElementById("targetTemperatureRangeContainer").style.display = activeMode == 3 ? "inline" : "none";
+            document.getElementById("targetTemperatureContainer").style.display = activeMode != 3 ? "inline" : "none";
+
+            document.getElementById("targetTemperaturePlaceholder").innerText = targetTemperature;
+            document.getElementById("targetMinTemperaturePlaceholder").innerText = heatingThresholdTemperature;
+            document.getElementById("targetMaxTemperaturePlaceholder").innerText = coolingThresholdTemperature;
+
+            document.getElementById("temperaturePlaceholder").innerText = currentTemperature;
+            document.getElementById("humidityPlaceholder").innerText = currentHumidity;
+        }
+
+        function sendMode(){
+            superagent
+                .get("/api/targetHeatingCoolingState")
+                .query({
+                    "state": activeMode,
+                    "web": true
+                })
+                .end();
+        }
+
+        function sendFanSpeed(){
+            superagent
+                .get("/api/targetFanState")
+                .query({
+                    "state": activeFan,
+                    "web": true
+                })
+                .end();
+        }
+    </script>
+    <div id="container">
+        <h1 style="text-align: center">AC Control</h1>
+        <div id="flexContainer">
+            <div id="controlColumn">
+                <div id="modeContainer">
+                    <h2>Mode</h2>
+                    <input type="radio" name="mode" id="mode0" onchange="activeMode=0;update();sendMode();" value="off">Off
+                    <input type="radio" name="mode" id="mode1" onchange="activeMode=1;update();sendMode();" value="heat">Heat
+                    <input type="radio" name="mode" id="mode2" onchange="activeMode=2;update();sendMode();" value="cool">Cool
+                    <input type="radio" name="mode" id="mode3" onchange="activeMode=3;update();sendMode();" value="auto">Auto
+                </div>
+                <div id="temperatureContainer">
+                    <h2>Temperature: 
+                        <span id="targetTemperatureContainer">
+                            <span id="targetTemperaturePlaceholder"></span>°C
+                        </span>
+                        <span id="targetTemperatureRangeContainer">
+                            <span id="targetMinTemperaturePlaceholder"></span>°C - <span id="targetMaxTemperaturePlaceholder"></span>°C
+                        </span>
+                    </h2>
+                    <div id="autoTemperatureControl">
+                    </div>
+                    <div id="manualTemperatureControl">
+                    </div>
+                </div>
+                <div id="fanSpeedContainer">
+                    <h2>Fan speed</h2>
+                    <input type="radio" name="fanSpeed" id="fan0" onchange="activeFan=0;update();sendFanSpeed();" value="quiet">Quiet
+                    <input type="radio" name="fanSpeed" id="fan1" onchange="activeFan=1;update();sendFanSpeed();" value="low">Low
+                    <input type="radio" name="fanSpeed" id="fan2" onchange="activeFan=2;update();sendFanSpeed();" value="med">Medium
+                    <input type="radio" name="fanSpeed" id="fan3" onchange="activeFan=3;update();sendFanSpeed();" value="high">High
+                    <input type="radio" name="fanSpeed" id="fan4" onchange="activeFan=4;update();sendFanSpeed();" value="auto">Auto
+                </div>
+            </div>
+            <div id="infoColumn">
+                <div id="currentTemperatureContainer">
+                    Current temperature: <span id="temperaturePlaceholder"></span>°C
+                </div>
+                <div id="currentHumidityContainer">
+                    Humidity: <span id="humidityPlaceholder"></span>%
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        var autoTemperatureSlider = document.getElementById('autoTemperatureControl');
+        noUiSlider.create(autoTemperatureSlider, {
+            start: [heatingThresholdTemperature, coolingThresholdTemperature],
+            step: 1,
+            connect: true,
+            margin: 1,
+            range: {
+                'min': [16],
+                'max': [30]
+            }
+        });
+        autoTemperatureSlider.noUiSlider.on('update.auto', (values, handle) => {
+            if (handle == 0){
+                heatingThresholdTemperature = Math.trunc(values[handle]);
+            } else {
+                coolingThresholdTemperature = Math.trunc(values[handle]);
+            }
+            update();
+        });
+        autoTemperatureSlider.noUiSlider.on('change.auto', (values) => {
+            superagent
+                .get("/api/heatingThresholdTemperature")
+                .query({
+                    "temp": values[0],
+                    "web": true
+                })
+                .end();
+            superagent
+                .get("/api/coolingThresholdTemperature")
+                .query({
+                    "temp": values[1],
+                    "web": true
+                })
+                .end();
+        });
+
+        var manualTemperatureSlider = document.getElementById('manualTemperatureControl');
+        noUiSlider.create(manualTemperatureSlider, {
+            start: targetTemperature,
+            step: 1,
+            range: {
+                'min': [16],
+                'max': [30]
+            }
+        });
+        manualTemperatureSlider.noUiSlider.on('update.manual', (values) => {
+            targetTemperature = Math.trunc(values[0]);
+            update();
+        });
+        manualTemperatureSlider.noUiSlider.on('change.manual', (values) => {
+            superagent
+                .get("/api/targetTemperature")
+                .query({
+                    "temp": values[0],
+                    "web": true
+                })
+                .end();
+        });
+
+        update();
+
+        if (!!window.EventSource) {
+            var source = new EventSource('/events');
+
+            source.addEventListener('targetState', function(e) {
+                activeMode = e.data;
+                update();
+            }, false);
+
+            source.addEventListener('fanState', function(e) {
+                activeFan = e.data;
+                update();
+            }, false);
+
+            source.addEventListener('targetTemp', function(e) {
+                manualTemperatureSlider.noUiSlider.set(e.data);
+                update();
+            }, false);
+
+            source.addEventListener('heatingTemp', function(e) {
+                autoTemperatureSlider.noUiSlider.set([e.data, null]);
+                update();
+            }, false);
+
+            source.addEventListener('coolingTemp', function(e) {
+                autoTemperatureSlider.noUiSlider.set([null, e.data]);
+                update();
+            }, false);
+
+            source.addEventListener('currTemp', function(e) {
+                currentTemperature = e.data;
+                update();
+            }, false);
+
+            source.addEventListener('currHum', function(e) {
+                currentHumidity = e.data;
+                update();
+            }, false);
+        } else {
+            alert("Your browser doesn't support Server Sent Events, this application will not function correctly.")
+        }
+    </script>
+</body>
+</html>
