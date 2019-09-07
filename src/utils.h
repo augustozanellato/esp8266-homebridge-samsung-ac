@@ -3,8 +3,10 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 
+#define DEBUG false
+
 #if DEBUG
-#define DEBUG_PRINTF(...) Serial.printf(__VA_ARGS__)
+#define DEBUG_PRINTF(x, ...) Serial.printf(PSTR(x), ##__VA_ARGS__)
 #else
 #define DEBUG_PRINTF(...)
 #endif
@@ -54,9 +56,10 @@ class OneParamRewrite : public AsyncWebRewrite{
     int _paramIndex;
     String _paramsBackup;
   public:
-    OneParamRewrite(const char* from, const char* to);
-    bool match(AsyncWebServerRequest *request) override;
+    OneParamRewrite(const char*, const char*);
+    bool match(AsyncWebServerRequest*) override;
 };
 
 DynamicJsonDocument generateJsonFromStatus(const Status&);
 int getStatusValueByIndex(const Status&, const StatusIndex);
+void debugPrintRequest(AsyncWebServerRequest*);

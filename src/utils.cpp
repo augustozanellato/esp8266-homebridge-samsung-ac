@@ -67,3 +67,26 @@ int getStatusValueByIndex(const Status& status, const StatusIndex idx){
             return -1;
     }
 }
+void debugPrintRequest(AsyncWebServerRequest* request){
+    #if DEBUG
+    DEBUG_PRINTF("Handling request %s %s from %s\n", request->methodToString(), request->url().c_str(), request->client()->remoteIP().toString().c_str());
+
+    int headers = request->headers();
+    for(int i=0;i<headers;i++){
+        AsyncWebHeader* h = request->getHeader(i);
+        DEBUG_PRINTF("HEADER[%s]: %s\n", h->name().c_str(), h->value().c_str());
+    }
+
+    int params = request->params();
+    for(int i=0;i<params;i++){
+        AsyncWebParameter* p = request->getParam(i);
+        if(p->isFile()){ //p->isPost() is also true
+            DEBUG_PRINTF("FILE[%s]: %s, size: %u\n", p->name().c_str(), p->value().c_str(), p->size());
+        } else if(p->isPost()){
+            DEBUG_PRINTF("POST[%s]: %s\n", p->name().c_str(), p->value().c_str());
+        } else {
+            DEBUG_PRINTF("GET[%s]: %s\n", p->name().c_str(), p->value().c_str());
+        }
+    }
+    #endif
+}

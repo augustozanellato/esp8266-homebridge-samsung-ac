@@ -1,8 +1,6 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 
-//set DEBUG to true in order to get debug messages on uart
-#define DEBUG false
 //controls the update interval for the dht11 sensor
 #define UPDATE_INTERVAL 5000
 //the port on which the server will run

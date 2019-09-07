@@ -9,8 +9,8 @@
 #include <ir_Samsung.h>
 #include <FS.h>
 
-#include "utils.h"
 #include "config.h"
+#include "utils.h"
 
 AsyncWebServer server(SERVER_PORT);
 AsyncEventSource events("/events");
@@ -39,9 +39,9 @@ void sendHomebridgeUpdate(const char* url, const int value){
     int httpCode = client.GET();
 
     if(httpCode > 0) {
-        DEBUG_PRINTF(PSTR("GET %s: OK!\n"), URLBuffer);
+        DEBUG_PRINTF("GET %s: OK!\n", URLBuffer);
     } else {
-        DEBUG_PRINTF(PSTR("GET %s: FAIL (%s)\n"), URLBuffer, client.errorToString(httpCode).c_str());
+        DEBUG_PRINTF("GET %s: FAIL (%s)\n", URLBuffer, client.errorToString(httpCode).c_str());
     }
 
     client.end(); 
@@ -60,30 +60,30 @@ void updateStatus(){
         sendEvent(PSTR("currTemp"), status.currentTemperature);
         sendEvent(PSTR("currHum"), status.currentRelativeHumidity);
     }
-    DEBUG_PRINTF(PSTR("Temperature: %d, Humidity: %d, targetTemperature: %d, coolingThresholdTemperature: %d, heatingThresholdTemperature: %d"), status.currentTemperature, status.currentRelativeHumidity, status.targetTemperature, status.coolingThresholdTemperature, status.heatingThresholdTemperature);
+    DEBUG_PRINTF("Temperature: %d, Humidity: %d, targetTemperature: %d, coolingThresholdTemperature: %d, heatingThresholdTemperature: %d", status.currentTemperature, status.currentRelativeHumidity, status.targetTemperature, status.coolingThresholdTemperature, status.heatingThresholdTemperature);
     if (status.targetHeatingCoolingState == STATE_AUTO){
-        DEBUG_PRINTF(PSTR(", target state is AUTO "));
+        DEBUG_PRINTF(", target state is AUTO ");
         if (status.currentTemperature > status.coolingThresholdTemperature){
-            DEBUG_PRINTF(PSTR("so current state is now COOL\n"));
+            DEBUG_PRINTF("so current state is now COOL\n");
             if (status.currentHeatingCoolingState != STATE_COOL){
                 status.currentHeatingCoolingState = STATE_COOL;
                 status.dirty = true;
             }
         } else if (status.currentTemperature < status.heatingThresholdTemperature){
-            DEBUG_PRINTF(PSTR("so current state is now HEAT\n"));
+            DEBUG_PRINTF("so current state is now HEAT\n");
             if (status.currentHeatingCoolingState != STATE_HEAT){
                 status.currentHeatingCoolingState = STATE_HEAT;
                 status.dirty = true;
             }
         } else {
-            DEBUG_PRINTF(PSTR("so current state is now OFF\n"));
+            DEBUG_PRINTF("so current state is now OFF\n");
             if(status.currentHeatingCoolingState != STATE_OFF){
                 status.currentHeatingCoolingState = STATE_OFF;
                 status.dirty = true;
             }
         }
     } else {
-        DEBUG_PRINTF(PSTR("\n"));
+        DEBUG_PRINTF("\n");
     }
 }
 
@@ -111,15 +111,19 @@ void initializeAPI(){
     server.addRewrite(new OneParamRewrite(PSTR("/api/heatingThresholdTemperature/{temperature}"), PSTR("/api/heatingThresholdTemperature?temp={temperature}")));
 
     server.on(PSTR("/api/targetHeatingCoolingState"), HTTP_GET, [] (AsyncWebServerRequest *request) {
+        debugPrintRequest(request);
         if (request->hasParam(STATE_PARAMETER)) {
-            status.targetHeatingCoolingState = static_cast<HeatingCoolingState>(request->getParam(STATE_PARAMETER)->value().toInt());
-            status.currentHeatingCoolingState = status.targetHeatingCoolingState;
-            shouldUpdateStatus = true;
-            status.dirty = true;
-            if (request->hasParam(WEBUI_PARAMETER)){
-                shouldPushUpdateToHomebridge[TARGET_HEATING_COOLING_STATE_INDEX] = true;
+            HeatingCoolingState newState = static_cast<HeatingCoolingState>(request->getParam(STATE_PARAMETER)->value().toInt());
+            if (newState != status.targetHeatingCoolingState){
+                status.targetHeatingCoolingState = newState;
+                status.currentHeatingCoolingState = status.targetHeatingCoolingState;
+                shouldUpdateStatus = status.targetHeatingCoolingState;
+                status.dirty = true;
+                if (request->hasParam(WEBUI_PARAMETER)){
+                    shouldPushUpdateToHomebridge[TARGET_HEATING_COOLING_STATE_INDEX] = true;
+                }
+                sendEvent(PSTR("targetState"), status.targetHeatingCoolingState);
             }
-            sendEvent(PSTR("targetState"), status.targetHeatingCoolingState);
             request->send_P(200, TEXT_PLAIN, SUCCESS);
         } else {
             request->send_P(400, TEXT_PLAIN, MALFORMED_REQUEST);
@@ -127,13 +131,17 @@ void initializeAPI(){
     });
 
     server.on(PSTR("/api/targetTemperature"), HTTP_GET, [] (AsyncWebServerRequest *request) {
+        debugPrintRequest(request);
         if (request->hasParam(TEMPERATURE_PARAMETER)) {
-            status.targetTemperature = request->getParam(TEMPERATURE_PARAMETER)->value().toInt();
-            status.dirty = true;
-            if (request->hasParam(WEBUI_PARAMETER)){
-                shouldPushUpdateToHomebridge[TARGET_TEMPERATURE_INDEX] = true;
+            int newTargetTemperature = request->getParam(TEMPERATURE_PARAMETER)->value().toInt();
+            if (newTargetTemperature != status.targetTemperature){
+                status.targetTemperature = newTargetTemperature;
+                status.dirty = true;
+                if (request->hasParam(WEBUI_PARAMETER)){
+                    shouldPushUpdateToHomebridge[TARGET_TEMPERATURE_INDEX] = true;
+                }
+                sendEvent(PSTR("targetTemp"), status.targetTemperature);
             }
-            sendEvent(PSTR("targetTemp"), status.targetTemperature);
             request->send_P(200, TEXT_PLAIN, SUCCESS);
         } else {
             request->send_P(400, TEXT_PLAIN, MALFORMED_REQUEST);
@@ -141,16 +149,17 @@ void initializeAPI(){
     });
 
     server.on(PSTR("/api/coolingThresholdTemperature"), HTTP_GET, [] (AsyncWebServerRequest *request) {
+        debugPrintRequest(request);
         if (request->hasParam(TEMPERATURE_PARAMETER)) {
             int newCoolingThresholdTemperature = request->getParam(TEMPERATURE_PARAMETER)->value().toInt();
             if (newCoolingThresholdTemperature != status.coolingThresholdTemperature){
                 status.coolingThresholdTemperature = newCoolingThresholdTemperature;
                 shouldUpdateStatus = true;
+                sendEvent(PSTR("coolingTemp"), status.coolingThresholdTemperature);
+                if (request->hasParam(WEBUI_PARAMETER)){
+                    shouldPushUpdateToHomebridge[COOLING_THRESHOLD_TEMPERATURE_INDEX] = true;
+                }
             }
-            if (request->hasParam(WEBUI_PARAMETER)){
-                shouldPushUpdateToHomebridge[COOLING_THRESHOLD_TEMPERATURE_INDEX] = true;
-            }
-            sendEvent(PSTR("coolingTemp"), status.coolingThresholdTemperature);
             request->send_P(200, TEXT_PLAIN, SUCCESS);
         } else {
             request->send_P(400, TEXT_PLAIN, MALFORMED_REQUEST);
@@ -158,16 +167,17 @@ void initializeAPI(){
     });
 
     server.on(PSTR("/api/heatingThresholdTemperature"), HTTP_GET, [] (AsyncWebServerRequest *request) {
+        debugPrintRequest(request);
         if (request->hasParam(TEMPERATURE_PARAMETER)) {
             int newHeatingThresholdTemperature = request->getParam(TEMPERATURE_PARAMETER)->value().toInt();
             if (newHeatingThresholdTemperature != status.heatingThresholdTemperature){
                 status.heatingThresholdTemperature = newHeatingThresholdTemperature;
                 shouldUpdateStatus = true;
+                if (request->hasParam(WEBUI_PARAMETER)){
+                    shouldPushUpdateToHomebridge[HEATING_THRESHOLD_TEMPERATURE_INDEX] = true;
+                }
+                sendEvent(PSTR("heatingTemp"), status.heatingThresholdTemperature);
             }
-            if (request->hasParam(WEBUI_PARAMETER)){
-                shouldPushUpdateToHomebridge[HEATING_THRESHOLD_TEMPERATURE_INDEX] = true;
-            }
-            sendEvent(PSTR("heatingTemp"), status.heatingThresholdTemperature);
             request->send_P(200, TEXT_PLAIN, SUCCESS);
         } else {
             request->send_P(400, TEXT_PLAIN, MALFORMED_REQUEST);
@@ -175,6 +185,7 @@ void initializeAPI(){
     });
 
     server.on(PSTR("/api/status"), HTTP_GET, [] (AsyncWebServerRequest *request) {
+        debugPrintRequest(request);
         AsyncResponseStream *response = request->beginResponseStream(PSTR("application/json"));
         serializeJsonPretty(generateJsonFromStatus(status), *response);
         request->send(response);
@@ -182,6 +193,7 @@ void initializeAPI(){
 }
 
 void notFound(AsyncWebServerRequest *request) {
+    debugPrintRequest(request);
     request->send_P(404, TEXT_PLAIN, PSTR("Not found"));
 }
 
@@ -208,10 +220,12 @@ void initializeWebUI(){
     server.addHandler(&events);
     server.serveStatic(PSTR("/assets/"), SPIFFS, PSTR("/assets/"));
     server.on(PSTR("/"), [] (AsyncWebServerRequest *request){
+        debugPrintRequest(request);
         request->send(SPIFFS, PSTR("/index.html"), String(), false, indexTemplater);
     });
 
     server.on(PSTR("/api/targetFanState"), HTTP_GET, [] (AsyncWebServerRequest *request) {
+        debugPrintRequest(request);
         if (request->hasParam(STATE_PARAMETER)) {
             status.fanState = static_cast<FanState>(request->getParam(STATE_PARAMETER)->value().toInt());
             status.dirty = true;
@@ -268,7 +282,7 @@ void loop() {
 
     if (status.dirty){
         status.dirty = false;
-        samsungAC.setTemp(status.targetHeatingCoolingState == STATE_AUTO ? (status.heatingThresholdTemperature + status.coolingThresholdTemperature) / 2 : status.targetTemperature);
+        samsungAC.setTemp(status.targetHeatingCoolingState == STATE_AUTO ? (status.currentHeatingCoolingState == STATE_HEAT ? status.coolingThresholdTemperature : status.heatingThresholdTemperature) : status.targetTemperature);
         bool targetPowerState = status.currentHeatingCoolingState != STATE_OFF;
         if (targetPowerState != samsungAC.getPower())
             samsungAC.setPower(targetPowerState);
@@ -299,7 +313,7 @@ void loop() {
             default:
                 break;
         }
-        DEBUG_PRINTF(PSTR("%s\n"), samsungAC.toString().c_str());
+        DEBUG_PRINTF("%s\n", samsungAC.toString().c_str());
         samsungAC.send();
     }
 }
