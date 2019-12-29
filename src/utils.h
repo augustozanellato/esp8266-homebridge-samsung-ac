@@ -3,8 +3,6 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 
-#define DEBUG false
-
 #if DEBUG
 #define DEBUG_PRINTF(x, ...) Serial.printf(PSTR(x), ##__VA_ARGS__)
 #else
@@ -19,26 +17,25 @@ extern const char* MALFORMED_REQUEST;
 extern const char* SUCCESS;
 extern const char* HOMEBRIDGE_UPDATE_URLS[];
 
-enum HeatingCoolingState {
-  STATE_OFF = 0,
-  STATE_HEAT = 1,
-  STATE_COOL = 2,
-  STATE_AUTO = 3
+enum class HeatingCoolingState: int {
+  Off = 0,
+  Heat = 1,
+  Cool = 2,
+  Auto = 3
+};
+enum class FanState: int {
+  Quiet = 0,
+  Low = 1,
+  Medium = 2,
+  High = 3,
+  Auto = 4
 };
 
-enum FanState {
-  FAN_QUIET = 0,
-  FAN_LOW = 1,
-  FAN_MEDIUM = 2,
-  FAN_HIGH = 3,
-  FAN_AUTO = 4
-};
-
-enum StatusIndex{
-  TARGET_HEATING_COOLING_STATE_INDEX = 0,
-  TARGET_TEMPERATURE_INDEX = 1,
-  COOLING_THRESHOLD_TEMPERATURE_INDEX = 2,
-  HEATING_THRESHOLD_TEMPERATURE_INDEX = 3
+enum class StatusIndex: int {
+  TargetHeatingCoolingState = 0,
+  TargetTemperature = 1,
+  CoolingThresholdTemperature = 2,
+  HeatingThresholdTemperature = 3
 };
 
 struct Status {

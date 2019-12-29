@@ -55,13 +55,13 @@ DynamicJsonDocument generateJsonFromStatus(const Status& status){
 
 int getStatusValueByIndex(const Status& status, const StatusIndex idx){
     switch (idx){
-        case TARGET_HEATING_COOLING_STATE_INDEX:
-            return status.targetHeatingCoolingState;
-        case TARGET_TEMPERATURE_INDEX:
+        case StatusIndex::TargetHeatingCoolingState:
+            return (int) status.targetHeatingCoolingState;
+        case StatusIndex::TargetTemperature:
             return status.targetTemperature;
-        case COOLING_THRESHOLD_TEMPERATURE_INDEX:
+        case StatusIndex::CoolingThresholdTemperature:
             return status.coolingThresholdTemperature;
-        case HEATING_THRESHOLD_TEMPERATURE_INDEX:
+        case StatusIndex::HeatingThresholdTemperature:
             return status.heatingThresholdTemperature;
         default:
             return -1;
@@ -71,15 +71,15 @@ void debugPrintRequest(AsyncWebServerRequest* request){
     #if DEBUG
     DEBUG_PRINTF("Handling request %s %s from %s\n", request->methodToString(), request->url().c_str(), request->client()->remoteIP().toString().c_str());
 
-    int headers = request->headers();
+    const int headers = request->headers();
     for(int i=0;i<headers;i++){
-        AsyncWebHeader* h = request->getHeader(i);
+        const AsyncWebHeader* h = request->getHeader(i);
         DEBUG_PRINTF("HEADER[%s]: %s\n", h->name().c_str(), h->value().c_str());
     }
 
     int params = request->params();
     for(int i=0;i<params;i++){
-        AsyncWebParameter* p = request->getParam(i);
+        const AsyncWebParameter* p = request->getParam(i);
         if(p->isFile()){ //p->isPost() is also true
             DEBUG_PRINTF("FILE[%s]: %s, size: %u\n", p->name().c_str(), p->value().c_str(), p->size());
         } else if(p->isPost()){

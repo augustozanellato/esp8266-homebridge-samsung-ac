@@ -60,31 +60,64 @@ void updateStatus(){
         sendEvent(PSTR("currTemp"), status.currentTemperature);
         sendEvent(PSTR("currHum"), status.currentRelativeHumidity);
     }
-    DEBUG_PRINTF("Temperature: %d, Humidity: %d, targetTemperature: %d, coolingThresholdTemperature: %d, heatingThresholdTemperature: %d", status.currentTemperature, status.currentRelativeHumidity, status.targetTemperature, status.coolingThresholdTemperature, status.heatingThresholdTemperature);
-    if (status.targetHeatingCoolingState == STATE_AUTO){
-        DEBUG_PRINTF(", target state is AUTO ");
-        if (status.currentTemperature > status.coolingThresholdTemperature){
-            DEBUG_PRINTF("so current state is now COOL\n");
-            if (status.currentHeatingCoolingState != STATE_COOL){
-                status.currentHeatingCoolingState = STATE_COOL;
-                status.dirty = true;
+    DEBUG_PRINTF("Temperature: %d, Humidity: %d, targetTemperature: %d, coolingThresholdTemperature: %d, heatingThresholdTemperature: %d ", status.currentTemperature, status.currentRelativeHumidity, status.targetTemperature, status.coolingThresholdTemperature, status.heatingThresholdTemperature);
+    switch (status.targetHeatingCoolingState) {
+        case HeatingCoolingState::Auto:
+            DEBUG_PRINTF(", target state is AUTO ");
+            if (status.currentTemperature > status.coolingThresholdTemperature){
+                DEBUG_PRINTF("so current state is now COOL");
+                if (status.currentHeatingCoolingState != HeatingCoolingState::Cool){
+                    status.currentHeatingCoolingState = HeatingCoolingState::Cool;
+                    status.dirty = true;
+                }
+            } else if (status.currentTemperature < status.heatingThresholdTemperature){
+                DEBUG_PRINTF("so current state is now HEAT");
+                if (status.currentHeatingCoolingState != HeatingCoolingState::Heat){
+                    status.currentHeatingCoolingState = HeatingCoolingState::Heat;
+                    status.dirty = true;
+                }
+            } else {
+                DEBUG_PRINTF("so current state is now OFF");
+                if(status.currentHeatingCoolingState != HeatingCoolingState::Off){
+                    status.currentHeatingCoolingState = HeatingCoolingState::Off;
+                    status.dirty = true;
+                }
             }
-        } else if (status.currentTemperature < status.heatingThresholdTemperature){
-            DEBUG_PRINTF("so current state is now HEAT\n");
-            if (status.currentHeatingCoolingState != STATE_HEAT){
-                status.currentHeatingCoolingState = STATE_HEAT;
-                status.dirty = true;
+            break;
+        case HeatingCoolingState::Cool:
+            if (status.currentTemperature < status.targetTemperature){
+                DEBUG_PRINTF("so current state is now OFF");
+                if (status.currentHeatingCoolingState != HeatingCoolingState::Off){
+                    status.currentHeatingCoolingState = HeatingCoolingState::Off;
+                    status.dirty = true;
+                }
+            } else {
+                DEBUG_PRINTF("so current state is now COOL");
+                if (status.currentHeatingCoolingState != HeatingCoolingState::Cool){
+                    status.currentHeatingCoolingState = HeatingCoolingState::Cool;
+                    status.dirty = true;
+                }
             }
-        } else {
-            DEBUG_PRINTF("so current state is now OFF\n");
-            if(status.currentHeatingCoolingState != STATE_OFF){
-                status.currentHeatingCoolingState = STATE_OFF;
-                status.dirty = true;
+            break;
+        case HeatingCoolingState::Heat:
+            if (status.currentTemperature > status.targetTemperature){
+                DEBUG_PRINTF("so current state is now OFF");
+                if(status.currentHeatingCoolingState != HeatingCoolingState::Off){
+                    status.currentHeatingCoolingState = HeatingCoolingState::Off;
+                    status.dirty = true;
+                }
+            } else {
+                DEBUG_PRINTF("so current state is now HEAT");
+                if (status.currentHeatingCoolingState != HeatingCoolingState::Heat){
+                    status.currentHeatingCoolingState = HeatingCoolingState::Heat;
+                    status.dirty = true;
+                }
             }
-        }
-    } else {
-        DEBUG_PRINTF("\n");
+            break;
+        default:
+            break;
     }
+    DEBUG_PRINTF("\n");
 }
 
 void initializeStatus(){
@@ -94,12 +127,12 @@ void initializeStatus(){
     samsungAC.setTemp(20);
     samsungAC.setSwing(false);
 
-    status.targetHeatingCoolingState = STATE_OFF;
-    status.currentHeatingCoolingState = STATE_OFF;
+    status.targetHeatingCoolingState = HeatingCoolingState::Off;
+    status.currentHeatingCoolingState = HeatingCoolingState::Off;
     status.targetTemperature = 20;
     status.coolingThresholdTemperature = 25;
     status.heatingThresholdTemperature = 20;
-    status.fanState = FAN_LOW;
+    status.fanState = FanState::Low;
 
     updateStatus();
 }
@@ -117,12 +150,12 @@ void initializeAPI(){
             if (newState != status.targetHeatingCoolingState){
                 status.targetHeatingCoolingState = newState;
                 status.currentHeatingCoolingState = status.targetHeatingCoolingState;
-                shouldUpdateStatus = status.targetHeatingCoolingState;
+                shouldUpdateStatus = (bool) status.targetHeatingCoolingState;
                 status.dirty = true;
                 if (request->hasParam(WEBUI_PARAMETER)){
-                    shouldPushUpdateToHomebridge[TARGET_HEATING_COOLING_STATE_INDEX] = true;
+                    shouldPushUpdateToHomebridge[(int) StatusIndex::TargetHeatingCoolingState] = true;
                 }
-                sendEvent(PSTR("targetState"), status.targetHeatingCoolingState);
+                sendEvent(PSTR("targetState"), (int) status.targetHeatingCoolingState);
             }
             request->send_P(200, TEXT_PLAIN, SUCCESS);
         } else {
@@ -138,7 +171,7 @@ void initializeAPI(){
                 status.targetTemperature = newTargetTemperature;
                 status.dirty = true;
                 if (request->hasParam(WEBUI_PARAMETER)){
-                    shouldPushUpdateToHomebridge[TARGET_TEMPERATURE_INDEX] = true;
+                    shouldPushUpdateToHomebridge[(int) StatusIndex::TargetTemperature] = true;
                 }
                 sendEvent(PSTR("targetTemp"), status.targetTemperature);
             }
@@ -157,7 +190,7 @@ void initializeAPI(){
                 shouldUpdateStatus = true;
                 sendEvent(PSTR("coolingTemp"), status.coolingThresholdTemperature);
                 if (request->hasParam(WEBUI_PARAMETER)){
-                    shouldPushUpdateToHomebridge[COOLING_THRESHOLD_TEMPERATURE_INDEX] = true;
+                    shouldPushUpdateToHomebridge[(int) StatusIndex::CoolingThresholdTemperature] = true;
                 }
             }
             request->send_P(200, TEXT_PLAIN, SUCCESS);
@@ -174,7 +207,7 @@ void initializeAPI(){
                 status.heatingThresholdTemperature = newHeatingThresholdTemperature;
                 shouldUpdateStatus = true;
                 if (request->hasParam(WEBUI_PARAMETER)){
-                    shouldPushUpdateToHomebridge[HEATING_THRESHOLD_TEMPERATURE_INDEX] = true;
+                    shouldPushUpdateToHomebridge[(int) StatusIndex::HeatingThresholdTemperature] = true;
                 }
                 sendEvent(PSTR("heatingTemp"), status.heatingThresholdTemperature);
             }
@@ -229,7 +262,7 @@ void initializeWebUI(){
         if (request->hasParam(STATE_PARAMETER)) {
             status.fanState = static_cast<FanState>(request->getParam(STATE_PARAMETER)->value().toInt());
             status.dirty = true;
-            sendEvent(PSTR("fanState"), status.fanState);
+            sendEvent(PSTR("fanState"), (int) status.fanState);
             request->send_P(200, TEXT_PLAIN, SUCCESS);
         } else {
             request->send_P(400, TEXT_PLAIN, MALFORMED_REQUEST);
@@ -245,7 +278,7 @@ void setup() {
     WiFi.config(deviceIP, gatewayIP, netMask, dnsIP);
     WiFi.begin(SSID, PASSWORD);
     if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        Serial.printf(PSTR("WiFi Failed!\n"));
+        Serial.printf(PSTR("WiFi connection failed!\n"));
         return;
     }
     SPIFFS.begin();
@@ -282,32 +315,32 @@ void loop() {
 
     if (status.dirty){
         status.dirty = false;
-        samsungAC.setTemp(status.targetHeatingCoolingState == STATE_AUTO ? (status.currentHeatingCoolingState == STATE_HEAT ? status.coolingThresholdTemperature : status.heatingThresholdTemperature) : status.targetTemperature);
-        bool targetPowerState = status.currentHeatingCoolingState != STATE_OFF;
+        samsungAC.setTemp(status.targetHeatingCoolingState == HeatingCoolingState::Auto ? (status.currentHeatingCoolingState == HeatingCoolingState::Heat ? status.coolingThresholdTemperature : status.heatingThresholdTemperature) : status.targetTemperature);
+        bool targetPowerState = status.currentHeatingCoolingState != HeatingCoolingState::Off;
         if (targetPowerState != samsungAC.getPower())
             samsungAC.setPower(targetPowerState);
         switch (status.currentHeatingCoolingState){
-            case STATE_HEAT:
+            case HeatingCoolingState::Heat:
                 samsungAC.setMode(kSamsungAcHeat); 
                 break;
-            case STATE_COOL:
+            case HeatingCoolingState::Cool:
                 samsungAC.setMode(kSamsungAcCool);
                 break;
             default:
                 break;
         }
-        samsungAC.setQuiet(status.fanState == FAN_QUIET);
+        samsungAC.setQuiet(status.fanState == FanState::Quiet);
         switch (status.fanState){
-            case FAN_LOW:
+            case FanState::Low:
                 samsungAC.setFan(kSamsungAcFanLow);
                 break;
-            case FAN_MEDIUM:
+            case FanState::Medium:
                 samsungAC.setFan(kSamsungAcFanMed);
                 break;
-            case FAN_HIGH:
+            case FanState::High:
                 samsungAC.setFan(kSamsungAcFanHigh);
                 break;
-            case FAN_AUTO:
+            case FanState::Auto:
                 samsungAC.setFan(kSamsungAcFanAuto);
                 break;
             default:
