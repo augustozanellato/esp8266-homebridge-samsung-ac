@@ -47,6 +47,25 @@ void sendHomebridgeUpdate(const char* url, const int value){
     client.end(); 
 }
 
+void setCurrentHeatingCoolingState(const HeatingCoolingState newState){
+    DEBUG_PRINTF(" so current state is now ");
+    switch (newState){
+        case HeatingCoolingState::Heat:
+            DEBUG_PRINTF("HEAT");
+            break;
+        case HeatingCoolingState::Cool:
+            DEBUG_PRINTF("COOL");
+            break;
+        case HeatingCoolingState::Off:
+            DEBUG_PRINTF("OFF");
+            break;
+    }
+    if (status.currentHeatingCoolingState != newState){
+        status.currentHeatingCoolingState = newState;
+        status.dirty = true;
+    }
+}
+
 void updateStatus(){
     float temperature = espDHT.getTemperature();
     float humidity = espDHT.getHumidity();
@@ -60,58 +79,30 @@ void updateStatus(){
         sendEvent(PSTR("currTemp"), status.currentTemperature);
         sendEvent(PSTR("currHum"), status.currentRelativeHumidity);
     }
-    DEBUG_PRINTF("Temperature: %d, Humidity: %d, targetTemperature: %d, coolingThresholdTemperature: %d, heatingThresholdTemperature: %d ", status.currentTemperature, status.currentRelativeHumidity, status.targetTemperature, status.coolingThresholdTemperature, status.heatingThresholdTemperature);
+    DEBUG_PRINTF("Temperature: %d, Humidity: %d, targetTemperature: %d, coolingThresholdTemperature: %d, heatingThresholdTemperature: %d", status.currentTemperature, status.currentRelativeHumidity, status.targetTemperature, status.coolingThresholdTemperature, status.heatingThresholdTemperature);
     switch (status.targetHeatingCoolingState) {
         case HeatingCoolingState::Auto:
-            DEBUG_PRINTF(", target state is AUTO ");
+            DEBUG_PRINTF(", target state is AUTO");
             if (status.currentTemperature > status.coolingThresholdTemperature){
-                DEBUG_PRINTF("so current state is now COOL");
-                if (status.currentHeatingCoolingState != HeatingCoolingState::Cool){
-                    status.currentHeatingCoolingState = HeatingCoolingState::Cool;
-                    status.dirty = true;
-                }
+                setCurrentHeatingCoolingState(HeatingCoolingState::Cool);
             } else if (status.currentTemperature < status.heatingThresholdTemperature){
-                DEBUG_PRINTF("so current state is now HEAT");
-                if (status.currentHeatingCoolingState != HeatingCoolingState::Heat){
-                    status.currentHeatingCoolingState = HeatingCoolingState::Heat;
-                    status.dirty = true;
-                }
+                setCurrentHeatingCoolingState(HeatingCoolingState::Heat);
             } else {
-                DEBUG_PRINTF("so current state is now OFF");
-                if(status.currentHeatingCoolingState != HeatingCoolingState::Off){
-                    status.currentHeatingCoolingState = HeatingCoolingState::Off;
-                    status.dirty = true;
-                }
+                setCurrentHeatingCoolingState(HeatingCoolingState::Off);
             }
             break;
         case HeatingCoolingState::Cool:
             if (status.currentTemperature < status.targetTemperature){
-                DEBUG_PRINTF("so current state is now OFF");
-                if (status.currentHeatingCoolingState != HeatingCoolingState::Off){
-                    status.currentHeatingCoolingState = HeatingCoolingState::Off;
-                    status.dirty = true;
-                }
+                setCurrentHeatingCoolingState(HeatingCoolingState::Off);
             } else {
-                DEBUG_PRINTF("so current state is now COOL");
-                if (status.currentHeatingCoolingState != HeatingCoolingState::Cool){
-                    status.currentHeatingCoolingState = HeatingCoolingState::Cool;
-                    status.dirty = true;
-                }
+                setCurrentHeatingCoolingState(HeatingCoolingState::Cool);
             }
             break;
         case HeatingCoolingState::Heat:
             if (status.currentTemperature > status.targetTemperature){
-                DEBUG_PRINTF("so current state is now OFF");
-                if(status.currentHeatingCoolingState != HeatingCoolingState::Off){
-                    status.currentHeatingCoolingState = HeatingCoolingState::Off;
-                    status.dirty = true;
-                }
+                setCurrentHeatingCoolingState(HeatingCoolingState::Off);
             } else {
-                DEBUG_PRINTF("so current state is now HEAT");
-                if (status.currentHeatingCoolingState != HeatingCoolingState::Heat){
-                    status.currentHeatingCoolingState = HeatingCoolingState::Heat;
-                    status.dirty = true;
-                }
+                setCurrentHeatingCoolingState(HeatingCoolingState::Heat);
             }
             break;
         default:
