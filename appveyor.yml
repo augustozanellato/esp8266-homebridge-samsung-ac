@@ -9,7 +9,7 @@ install:
     sudo python3 -m pip install platformio
 build_script:
 - sh: >-
-    cp src/config.sample.h src/config.h
+    cp src/config.sample.cpp src/config.cpp
 
     platformio run
 test: off
