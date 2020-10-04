@@ -12,5 +12,5 @@ install:
     - platformio update
 
 script:
-    - cp src/config.sample.cpp src/config.cpp
+    - cp src/config.sample.h src/config.h
     - platformio run
