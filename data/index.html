@@ -11,13 +11,13 @@
 </head>
 <body>
     <script>
-        let activeMode = %ACTIVE_MODE%;
-        let activeFan = %ACTIVE_FAN%;
-        let currentTemperature = %CURRENT_TEMPERATURE%;
-        let currentHumidity = %CURRENT_HUMIDITY%;
-        let targetTemperature = %TARGET_TEMPERATURE%;
-        let heatingThresholdTemperature = %HEATING_THRESHOLD_TEMPERATURE%;
-        let coolingThresholdTemperature = %COOLING_THRESHOLD_TEMPERATURE%;
+        var activeMode = %ACTIVE_MODE%;
+        var activeFan = %ACTIVE_FAN%;
+        var currentTemperature = %CURRENT_TEMPERATURE%;
+        var currentHumidity = %CURRENT_HUMIDITY%;
+        var targetTemperature = %TARGET_TEMPERATURE%;
+        var heatingThresholdTemperature = %HEATING_THRESHOLD_TEMPERATURE%;
+        var coolingThresholdTemperature = %COOLING_THRESHOLD_TEMPERATURE%;
 
         function update(){
             document.getElementById("mode" + activeMode).checked = true;
@@ -102,7 +102,7 @@
         </div>
     </div>
     <script>
-        let autoTemperatureSlider = document.getElementById('autoTemperatureControl');
+        var autoTemperatureSlider = document.getElementById('autoTemperatureControl');
         noUiSlider.create(autoTemperatureSlider, {
             start: [heatingThresholdTemperature, coolingThresholdTemperature],
             step: 1,
@@ -138,7 +138,7 @@
                 .end();
         });
 
-        let manualTemperatureSlider = document.getElementById('manualTemperatureControl');
+        var manualTemperatureSlider = document.getElementById('manualTemperatureControl');
         noUiSlider.create(manualTemperatureSlider, {
             start: targetTemperature,
             step: 1,

@@ -7,7 +7,7 @@
 #include <IRremoteESP8266.h>
 #include <IRsend.h>
 #include <ir_Samsung.h>
-#include <LittleFS.h>
+#include <FS.h>
 
 #include "config.h"
 #include "utils.h"
@@ -58,8 +58,6 @@ void setCurrentHeatingCoolingState(const HeatingCoolingState newState){
             break;
         case HeatingCoolingState::Off:
             DEBUG_PRINTF("OFF");
-            break;
-        default:
             break;
     }
     if (status.currentHeatingCoolingState != newState){
@@ -244,10 +242,10 @@ String indexTemplater(const String& var) {
 
 void initializeWebUI(){
     server.addHandler(&events);
-    server.serveStatic(PSTR("/assets/"), LittleFS, PSTR("/assets/"));
+    server.serveStatic(PSTR("/assets/"), SPIFFS, PSTR("/assets/"));
     server.on(PSTR("/"), [] (AsyncWebServerRequest *request){
         debugPrintRequest(request);
-        request->send(LittleFS, PSTR("/index.html"), String(), false, indexTemplater);
+        request->send(SPIFFS, PSTR("/index.html"), String(), false, indexTemplater);
     });
 
     server.on(PSTR("/api/targetFanState"), HTTP_GET, [] (AsyncWebServerRequest *request) {
@@ -274,7 +272,7 @@ void setup() {
         Serial.printf(PSTR("WiFi connection failed!\n"));
         return;
     }
-    LittleFS.begin();
+    SPIFFS.begin();
 
     pinMode(16, OUTPUT);
     digitalWrite(16, HIGH);

@@ -1,5 +1,4 @@
-#include "utils.h"
-#include "config.h"
+#include <utils.h>
 
 const char* TEXT_PLAIN PROGMEM = "text/plain";
 const char* STATE_PARAMETER PROGMEM = "state";
