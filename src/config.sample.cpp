@@ -1,10 +1,11 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include "config.h"
 
 //controls the update interval for the dht11 sensor
-#define UPDATE_INTERVAL 5000
-//the port on which the server will run
-#define SERVER_PORT 80
+const unsigned long UPDATE_INTERVAL = 5000;
+//the port on which the web server will run
+const int SERVER_PORT = 80;
 
 //your network configuration
 const IPAddress deviceIP(192, 168, 1, 3);

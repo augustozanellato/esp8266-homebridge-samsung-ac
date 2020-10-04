@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include "config.h"
 
 #if DEBUG
 #define DEBUG_PRINTF(x, ...) Serial.printf(PSTR(x), ##__VA_ARGS__)
